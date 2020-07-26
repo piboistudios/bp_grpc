@@ -2,6 +2,7 @@
 --library bp_test_utils
 --library tink_io
 --library tink_unittest
+--library tink_web
 --library travix
 -cp src
 -cp test

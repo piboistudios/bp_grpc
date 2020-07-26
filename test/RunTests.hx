@@ -1,5 +1,11 @@
 package;
 
+import tink.http.containers.*;
+import tink.http.Response;
+import tink.web.routing.*;
+import tink.http.clients.*;
+import tink.web.proxy.Remote;
+import tink.url.Host;
 import tink.testrunner.*;
 import tink.unit.*;
 
@@ -15,7 +21,7 @@ using tink.CoreApi;
 
 class RunTests {
 	static function main() {
-		Runner.run(TestBatch.make([new BasicTest()])).handle(Runner.exit);
+		Runner.run(TestBatch.make([new BasicTest(), new WebTest()])).handle(Runner.exit);
 	}
 }
 
@@ -100,6 +106,66 @@ class BasicTest {
 			this.writer.write({foo: '$i'});
 		}
 		this.writer.end();
+		return asserts;
+	}
+}
+
+class Grpc {
+	public function new() {}
+
+	@:get('/')
+	// @:params(source = body)
+	public function echo(body:RealSource):RealSource {
+		var reader:RealStream<{msg:String}> = new GrpcStreamParser<{msg:String}>(body).toStream();
+		var source = body;
+		var writer:GrpcWriter<{msg:String}> = new GrpcStreamWriter<{msg:String}>();
+		reader.forEach(m -> {
+			if (m != null) {
+				writer.write({msg: 'echo: ${m.msg}'});
+			}
+			Resume;
+		}).handle(_ -> {
+			writer.end();
+		});
+		return writer;
+	}
+}
+
+@:asserts
+class WebTest {
+	var container:LocalContainer;
+	var remote:Remote<Grpc>;
+
+	public function new() {}
+
+	@:setup
+	public function setup() {
+		this.container = new LocalContainer();
+		var router = new Router<Grpc>(new Grpc());
+		container.run(req -> {
+			return router.route(Context.ofRequest(req)).recover(OutgoingResponse.reportError);
+		});
+		var client = new LocalContainerClient(this.container);
+		this.remote = new Remote<Grpc>(client, new RemoteEndpoint(new Host('localhost', 80)));
+		return Noise;
+	}
+
+	public function test_echo() {
+		var writer:GrpcWriter<{msg:String}> = new GrpcStreamWriter<{msg:String}>();
+		remote.echo(writer).next(res -> {
+			var reader:GrpcReader<{msg:String}> = new GrpcStreamParser<{msg:String}>(res.body);
+			var stream:RealStream<{msg:String}> = reader;
+			var i = 0;
+			stream.forEach(m -> {
+				if(m != null) asserts.assert(m.msg == 'echo: ${i++}');
+				Resume;
+			}).handle(_ -> {
+				asserts.done();
+			});
+		}).eager();
+		for (i in 0...10)
+			writer.write({msg: '$i'});
+		writer.end();
 		return asserts;
 	}
 }

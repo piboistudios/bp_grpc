@@ -11,11 +11,9 @@ import tink.streams.RealStream;
 abstract GrpcReader<T>(GrpcStreamParserObject<T>) from GrpcStreamParserObject<T> to GrpcStreamParserObject<T> to tink.io.StreamParser<T> {
 	
 
-	@:to inline function get_stream():RealStream<T>
+	@:to inline function toStream():RealStream<T>
 		return this.toStream();
-	// @:
-	// public function forEach<Safety>(handle:Handler<Item, Safety>):Future<Conclusion<Item, Safety, Quality>> {
-	// 	return .forEach(handle);
+	
 }
 
 interface GrpcStreamParserObject<T> extends tink.io.StreamParserObject<T> {
@@ -40,8 +38,9 @@ class GrpcStreamParserBase {
 	var text(get, never):String;
 	var source:RealSource;
 
-	public function new() {
+	public function new(?source) {
 		this.buf = new StringBuf();
+		this.source = source;
 	}
 	public function prepare(source) {
 		this.source = source;

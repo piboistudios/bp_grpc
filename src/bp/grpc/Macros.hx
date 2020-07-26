@@ -42,8 +42,8 @@ class GrpcStreamParserBuilder {
 		var cl = macro class $name extends bp.grpc.GrpcStreamParser.GrpcStreamParserBase implements bp.grpc.GrpcStreamParser.GrpcStreamParserObject<$ct> implements tink.io.StreamParser.StreamParserObject<$ct> {
 			var parser:tink.json.Parser<$ct>;
 
-			public function new() {
-				super();
+			public function new(?source:tink.io.Source.RealSource) {
+				super(source);
 				this.parser = new tink.json.Parser<$ct>();
 			}
 			public function toStream() {
