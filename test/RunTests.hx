@@ -86,7 +86,6 @@ class BasicTest {
 		var source:RealSource = this.writer;
 		this.reader.prepare(source);
 		var stream:RealStream<Null<{foo:String}>> = this.reader;
-		var i = 0;
 		var i2 = 0;
 		stream.forEach(c -> {
 			if (c != null) {
