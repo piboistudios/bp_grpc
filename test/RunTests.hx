@@ -8,6 +8,8 @@ using bp.test.Utils;
 
 import bp.grpc.GrpcStreamParser;
 import bp.grpc.GrpcStreamWriter;
+import tink.streams.*;
+import tink.streams.Stream;
 
 using tink.CoreApi;
 
@@ -21,22 +23,21 @@ class RunTests {
 class BasicTest {
 	public function new() {}
 
-	var parser:GrpcStreamParser<{foo:String}>;
-	var writer:GrpcStreamWriter<{foo:String}>;
-	var result:Promise<Pair<{foo:String}, RealSource>>;
+	var reader:GrpcReader<Null<{foo:String}>>;
+	var writer:GrpcWriter<Null<{foo:String}>>;
+	var result:Promise<Pair<Null<{foo:String}>, RealSource>>;
 
 	@:setup
 	public function setup() {
-		this.parser = new GrpcStreamParser<{foo:String}>();
-		this.writer = new GrpcStreamWriter<{foo:String}>();
+		this.reader = new GrpcStreamParser<Null<{foo:String}>>();
+		this.writer = new GrpcStreamWriter<Null<{foo:String}>>();
 		return Noise;
 	}
 
 	public function make_stream() {
 		var trial = ({
-			
-			var stream:RealSource = this.writer.getStream();
-			this.result = stream.parse(parser).tryRecover(e -> {
+			var stream:RealSource = this.writer;
+			this.result = stream.parse(reader).tryRecover(e -> {
 				trace(e);
 				e;
 			});
@@ -44,23 +45,33 @@ class BasicTest {
 			this.writer.write({foo: "baz"});
 			haxe.Timer.delay(() -> {
 				this.writer.write({foo: 'qux'});
-				this.writer.end();
+				haxe.Timer.delay(() -> {
+					this.writer.write(null);
+					haxe.Timer.delay(() -> {
+						this.writer.end();
+					}, 500);
+				}, 1000);
 			}, 2500);
 			Noise;
 		}).attempt(true);
 		return asserts.assert(trial);
 	}
 
-	public function consume_stream() {
+	@:timeout(10000)
+	public function parse_reader() {
 		this.result.next(t -> {
 			asserts.assert(t.a.foo == "bar");
-			t.b.parse(parser).next(t -> {
+			t.b.parse(reader).next(t -> {
 				asserts.assert(t.a.foo == 'baz');
-				t.b.parse(parser).next(t -> {
+				t.b.parse(reader).next(t -> {
 					asserts.assert(t.a.foo == 'qux');
-					t.b.parse(parser).next(t -> {
+					t.b.parse(reader).next(t -> {
 						asserts.assert(t.a == null);
-						asserts.done();
+						asserts.assert(!t.b.depleted);
+						t.b.parse(reader).next(t -> {
+							asserts.assert(t.b.depleted);
+							asserts.done();
+						});
 					});
 				});
 			});
@@ -68,6 +79,28 @@ class BasicTest {
 			trace(e);
 			asserts.done();
 		}).eager();
+		return asserts;
+	}
+
+	public function streaming() {
+		var source:RealSource = this.writer;
+		this.reader.prepare(source);
+		var stream:RealStream<Null<{foo:String}>> = this.reader;
+		var i = 0;
+		var i2 = 0;
+		stream.forEach(c -> {
+			if (c != null) {
+				asserts.assert(c.foo == '${i2++}');
+				Resume;
+			} else
+				BackOff;
+		}).handle(_ -> {
+			asserts.done();
+		});
+		for (i in 0...10) {
+			this.writer.write({foo: '$i'});
+		}
+		this.writer.end();
 		return asserts;
 	}
 }

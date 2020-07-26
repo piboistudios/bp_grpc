@@ -1,62 +1,71 @@
 package bp.grpc;
+
 import tink.macro.BuildCache;
+
 using tink.MacroApi;
 
 class GrpcStreamParserBuilder {
 	public static function buildWriter()
 		return tink.macro.BuildCache.getType('bp.grpc.GrpcStreamWriter', doBuildWriter);
-	public static function buildParser() {
+
+	public static function buildParser()
 		return tink.macro.BuildCache.getType('bp.grpc.GrpcStreamParser', doBuildParser);
-	}
+
+	
+
 	static function doBuildWriter(ctx:BuildContext) {
+		
 		var name = ctx.name;
 		var ct = ctx.type.toComplex();
-		var abst = macro class $name {
-			@:pure var writer:tink.json.Writer<$ct>;
-			
-			@:pure var signal:tink.core.Signal.SignalTrigger<tink.streams.Stream.Yield<tink.Chunk, tink.core.Error>>;
+		
+		var cl = macro class $name extends bp.grpc.GrpcStreamWriter.GrpcStreamWriterBase<$ct> {
+			var writer:tink.json.Writer<$ct>;
+
 			public function new() {
 				this.writer = new tink.json.Writer<$ct>();
 				this.signal = tink.core.Signal.trigger();
 			}
 
-			public function write(object:$ct) {
+			override public function write(object:$ct) {
 				var output:String = writer.write(object);
 				var data = Std.string(output.length) + '\r\n' + output;
 				signal.trigger(Data(data));
-				
-			}
-			public function end() {
-				signal.trigger(End);
-			}
-
-			public function error(e) {
-				signal.trigger(Fail(e));
-			}
-
-			public function getStream():tink.io.Source.RealSource {
-				return new tink.streams.Stream.SignalStream(this.signal);
 			}
 		}
-		return abst;
+		
+		return cl;
 	}
+
 	static function doBuildParser(ctx:BuildContext) {
 		var name = ctx.name;
 		var ct = ctx.type.toComplex();
-		var cl = macro class $name extends bp.grpc.GrpcStreamParser.GrpcStreamParserBase implements tink.io.StreamParser.StreamParserObject<$ct> {
+		var cl = macro class $name extends bp.grpc.GrpcStreamParser.GrpcStreamParserBase implements bp.grpc.GrpcStreamParser.GrpcStreamParserObject<$ct> implements tink.io.StreamParser.StreamParserObject<$ct> {
 			var parser:tink.json.Parser<$ct>;
 
 			public function new() {
 				super();
 				this.parser = new tink.json.Parser<$ct>();
 			}
-
+			public function toStream() {
+				var message = tink.core.Signal.trigger();
+				var stream = new tink.streams.Stream.SignalStream(message);
+				function parse()
+					return tink.io.Source.RealSourceTools.parse(this.source,this).next(result -> {
+						message.trigger(Data(result.a));
+						if(result.b.depleted) message.trigger(End);
+						else {
+							this.source = result.b;
+							parse();
+						}
+						tink.core.Noise;
+					}).eager();
+				parse();
+				return stream;
+			}
 			public function progress(cursor:tink.chunk.ChunkCursor) {
 				if (messageLength == -1) {
-					
 					return readLength(cursor);
 				} else {
-					
 					return readMessage(cursor);
 				}
 			}
@@ -103,5 +112,4 @@ class GrpcStreamParserBuilder {
 		}
 		return cl;
 	}
-	
 }
