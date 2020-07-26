@@ -1,0 +1,14 @@
+--library tink_json
+--library bp_test_utils
+--library tink_io
+--library tink_unittest
+--library travix
+-cp src
+-cp test
+-D analyzer-optimize
+-main RunTests
+--each
+--library hxnodejs
+-js bin/node/test.js
+--next
+-js bin/js/test.js
