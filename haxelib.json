@@ -1,0 +1,22 @@
+{
+    "name": "bp_grpc",
+    "license": "MIT",
+    "tags": [
+        "brave-pi",
+        "brave",
+        "pi",
+        "grpc"
+    ],
+    "classPath": "src",
+    "contributors": [
+        "back2dos"
+    ],
+    "releasenote": "initial release",
+    "version": "0.0.0",
+    "url": "https://github.com/brave-pi/bp_grpc/",
+    "dependencies": {
+        "tink_io": "",
+        "tink_web": "",
+        "tink_json": ""
+    }
+}

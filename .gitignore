@@ -1,3 +1,5 @@
 node_modules/**
 bin/**
 README-tmp.md
+*.py
+*.js

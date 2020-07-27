@@ -114,9 +114,8 @@ class Grpc {
 	public function new() {}
 
 	@:get('/')
-	// @:params(source = body)
 	public function echo(body:RealSource):RealSource {
-		var reader:RealStream<{msg:String}> = new GrpcStreamParser<{msg:String}>(body).toStream();
+		var reader = new GrpcStreamParser<{msg:String}>(body).toStream();
 		var source = body;
 		var writer:GrpcWriter<{msg:String}> = new GrpcStreamWriter<{msg:String}>();
 		reader.forEach(m -> {
